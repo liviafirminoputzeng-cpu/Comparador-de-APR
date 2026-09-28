@@ -1,0 +1,39 @@
+COMPARADOR DE REVISÕES DE APR
+
+1. Abra a pasta do projeto no VS Code.
+2. Abra Terminal > Novo Terminal.
+3. Ative o ambiente virtual no Windows PowerShell:
+   .\.venv\Scripts\Activate.ps1
+4. Instale ou atualize as dependências:
+   py -m pip install -r requirements.txt
+5. Inicie o site:
+   streamlit run app.py
+
+ARQUIVOS OBRIGATÓRIOS
+
+- app.py
+- extracao.py
+- comparacao.py
+- exportacao.py
+- bowtie_preview.py
+- requirements.txt
+- assets/logo_putz.jpg
+- assets/modelo_resultado_apr.xlsx
+
+REGRAS DE CORES DA ABA ALTERAÇÕES
+
+- Verde: informação incluída ou cenário novo.
+- Vermelho: informação excluída ou cenário removido.
+- Amarelo: informação alterada.
+- A linha inteira recebe a cor correspondente.
+
+CONFIABILIDADE
+
+O site prioriza o nome do desvio e usa sistema, trecho, causas, efeitos e
+códigos de equipamentos como apoio. Nó, número do cenário e ID não definem a
+correspondência. Casos com baixa similaridade, opções concorrentes, mudança de
+sistema, possível unificação ou ausência de par são mantidos no resultado e
+marcados como REVISAR.
+
+A classificação automática e os candidatos a Bow Tie devem passar por
+validação técnica antes da emissão definitiva.

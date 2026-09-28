@@ -1,6 +1,8 @@
 import hashlib
+import io
 import json
 import re
+import zipfile
 from pathlib import Path
 
 import pandas as pd
@@ -8,6 +10,7 @@ import streamlit as st
 import streamlit.components.v1 as components
 
 from bowtie_preview import altura_previa_bowtie, montar_html_bowtie
+from bowtie_excel import gerar_bowtie, nome_bowtie
 from comparacao import (
     candidato_bowtie,
     comparar_revisoes,
@@ -37,8 +40,8 @@ with coluna_titulo:
     )
 
 st.info(
-    "O resultado será disponibilizado em um único arquivo Excel (.xlsx), "
-    "com todas as planilhas da análise organizadas por nó."
+    "A comparação sai em um Excel (.xlsx). Cada cenário selecionado gera "
+    "seu próprio BowTie no modelo do nó (.xlsx), com download individual ou de todos em ZIP."
 )
 
 coluna_antiga, coluna_atualizada = st.columns(2)
@@ -120,6 +123,17 @@ def _ordenar_cenarios(cenarios):
     )
 
 
+def _cor_linha_alteracao(linha):
+    tipo = str(linha.get("Tipo de alteração", "") or "").casefold()
+    if "incluíd" in tipo or "novo" in tipo:
+        cor = "#C6EFCE"
+    elif "excluíd" in tipo or "removido" in tipo:
+        cor = "#FFC7CE"
+    else:
+        cor = "#FFEB9C"
+    return [f"background-color: {cor}"] * len(linha)
+
+
 STATUS_EXIBICAO = {
     "MANTIDO / ALTERADO": "NOME DO DESVIO MANTIDO",
     "RENOMEADO / ALTERADO": "NOME DO DESVIO ALTERADO",
@@ -142,6 +156,8 @@ if pdfs_identicos:
         "resultado_comparacao",
         "arquivo_excel",
         "nome_excel",
+        "arquivo_bowtie_individual",
+        "arquivo_bowtie_zip",
     ):
         st.session_state.pop(chave, None)
 
@@ -166,6 +182,11 @@ if st.button(
         st.session_state.pop("resultado_comparacao", None)
         st.session_state.pop("arquivo_excel", None)
         st.session_state.pop("nome_excel", None)
+        st.session_state.pop("arquivo_bowtie_individual", None)
+        st.session_state.pop("arquivo_bowtie_zip", None)
+        st.session_state["assinaturas_apr_extraidas"] = (
+            assinatura_pdf(apr_antiga), assinatura_pdf(apr_atualizada)
+        )
         st.success("Extração concluída.")
 
     except Exception as erro:
@@ -176,6 +197,9 @@ if st.button(
 if (
     "resultado_antiga" in st.session_state
     and "resultado_atualizada" in st.session_state
+    and arquivos_enviados
+    and st.session_state.get("assinaturas_apr_extraidas")
+    == (assinatura_pdf(apr_antiga), assinatura_pdf(apr_atualizada))
 ):
     antiga = st.session_state["resultado_antiga"]
     atualizada = st.session_state["resultado_atualizada"]
@@ -282,6 +306,8 @@ if (
             st.session_state["resultado_comparacao"] = resultado_comparacao
             st.session_state.pop("arquivo_excel", None)
             st.session_state.pop("nome_excel", None)
+            st.session_state.pop("arquivo_bowtie_individual", None)
+            st.session_state.pop("arquivo_bowtie_zip", None)
             st.success("Comparação concluída.")
         except Exception as erro:
             st.error("Não foi possível comparar os cenários.")
@@ -350,8 +376,9 @@ if (
         )
 
         st.info(
-            "Correspondências com confiança baixa e cenários sem par devem "
-            "ser conferidos antes da emissão do Excel final."
+            f"Resultados marcados como REVISAR: "
+            f"{resumo.get('CORRESPONDÊNCIAS A REVISAR', 0)}. "
+            "Eles serão mantidos no Excel, com o motivo da revisão indicado."
         )
 
         (
@@ -419,7 +446,7 @@ if (
                 tabela_alteracoes["Tipo de alteração"].isin(tipos_selecionados)
             ]
             st.dataframe(
-                alteracoes_filtradas,
+                alteracoes_filtradas.style.apply(_cor_linha_alteracao, axis=1),
                 use_container_width=True,
                 hide_index=True,
                 height=520,
@@ -555,8 +582,9 @@ if (
         st.subheader("Gerar arquivo Excel")
         st.write(
             "O arquivo reúne o resumo, as duas APRs estruturadas, o comparativo, "
-            "as alterações e uma aba exclusiva com os candidatos Bow Tie. Todas "
-            "as planilhas são entregues no formato Excel (.xlsx)."
+            "as alterações e as abas de enquadramento dos candidatos Bow Tie, "
+            "seguindo o modelo oficial. Todas as planilhas são entregues no "
+            "formato Excel (.xlsx)."
         )
 
         if st.button("Preparar Excel para download"):
@@ -583,3 +611,160 @@ if (
                 ),
                 type="primary",
             )
+
+        st.divider()
+        st.subheader("Gerar ou atualizar BowTies por cenário")
+        st.write(
+            "Cada cenário da APR atualizada gera um arquivo .xlsx no layout "
+            "do modelo NÓ_1. Ao atualizar um BowTie .xlsm existente, o arquivo "
+            "gerado continua .xlsm e conserva suas macros."
+        )
+        incluir_todos = st.checkbox(
+            "Incluir também cenários que não são candidatos a BowTie",
+            value=False,
+            key="incluir_todos_bowties",
+        )
+        cenarios_bowtie = [
+            c for c in _ordenar_cenarios(atualizada["cenarios"])
+            if incluir_todos or candidato_bowtie(c)
+        ]
+        if not cenarios_bowtie:
+            st.warning("A APR atualizada não contém cenários para esta seleção.")
+        else:
+            opcoes = list(range(len(cenarios_bowtie)))
+            indice = st.selectbox(
+                "Escolha o cenário para baixar ou atualizar",
+                opcoes,
+                format_func=lambda i: (
+                    f"Nó {cenarios_bowtie[i].get('Nó', '')} | "
+                    f"{cenarios_bowtie[i].get('ID', '')} | "
+                    f"{str(cenarios_bowtie[i].get('Perigo', '')).replace(chr(10), ' ')}"
+                ),
+                key="cenario_para_excel_bowtie",
+            )
+            cenario_escolhido = cenarios_bowtie[indice]
+            st.caption(
+                f"{len(cenarios_bowtie)} cenário(s) disponíveis. "
+                "Modos de detecção não entram no BowTie. "
+                "Os códigos SM2, SM7, SM8 e SM10 vão para TAG. "
+                "Dados técnicos que não aparecem nas APRs permanecem em branco. "
+                "Confira a classificação automática das barreiras antes de usar o arquivo."
+            )
+            bowtie_existente = st.file_uploader(
+                "Atualizar um BowTie com macros (opcional): envie o .xlsm do cenário selecionado",
+                type=["xlsm"],
+                key="bowtie_existente",
+                help="Ao enviar um arquivo, os dados preenchidos anteriormente são preservados. "
+                     "O evento topo e o sistema devem corresponder ao cenário nas APRs.",
+            )
+
+            antigo_por_id = {c["ID"]: c for c in antiga["cenarios"]}
+            pares = [
+                p for p in comparacao["correspondencias"]
+                if p.get("ID atualizada") == cenario_escolhido["ID"]
+                and p.get("ID antiga") in antigo_por_id
+            ]
+            par = pares[0] if len(pares) == 1 else None
+            if bowtie_existente is not None:
+                if not par:
+                    st.warning(
+                        "Não foi localizado um único cenário correspondente na APR antiga. "
+                        "A atualização deste BowTie precisa de conferência humana."
+                    )
+                elif par.get("Validação") == "REVISAR":
+                    st.warning(
+                        "Correspondência marcada como REVISAR: "
+                        + str(par.get("Motivo da revisão") or "confira o par de cenários")
+                    )
+
+            if st.button("Preparar BowTie selecionado", key="preparar_bowtie"):
+                try:
+                    with st.spinner("Preenchendo o modelo Excel com a APR atualizada..."):
+                        arquivo, alertas = gerar_bowtie(
+                            cenario_escolhido,
+                            atualizada,
+                            modelo=bowtie_existente.getvalue() if bowtie_existente else None,
+                            cenario_antigo=antigo_por_id[par["ID antiga"]]
+                            if bowtie_existente is not None and par else None,
+                        )
+                    st.session_state["arquivo_bowtie_individual"] = arquivo
+                    st.session_state["nome_bowtie_individual"] = nome_bowtie(
+                        cenario_escolhido, atualizado=bowtie_existente is not None
+                    )
+                    st.session_state["alertas_bowtie_individual"] = alertas
+                    st.session_state["assinatura_bowtie_individual"] = (
+                        assinatura_pdf(apr_atualizada),
+                        cenario_escolhido["ID"],
+                        hashlib.sha256(bowtie_existente.getvalue()).hexdigest()
+                        if bowtie_existente else "",
+                    )
+                    st.success("BowTie preparado para download.")
+                except (ValueError, OSError, zipfile.BadZipFile) as erro:
+                    st.session_state.pop("arquivo_bowtie_individual", None)
+                    st.error(str(erro))
+
+            assinatura_selecao = (
+                assinatura_pdf(apr_atualizada), cenario_escolhido["ID"],
+                hashlib.sha256(bowtie_existente.getvalue()).hexdigest()
+                if bowtie_existente else "",
+            )
+            if (st.session_state.get("arquivo_bowtie_individual") is not None
+                    and st.session_state.get("assinatura_bowtie_individual") == assinatura_selecao):
+                for aviso in st.session_state.get("alertas_bowtie_individual", []):
+                    st.warning(aviso)
+                st.download_button(
+                    "Baixar este BowTie (Excel)",
+                    data=st.session_state["arquivo_bowtie_individual"],
+                    file_name=st.session_state["nome_bowtie_individual"],
+                    mime=("application/vnd.ms-excel.sheet.macroEnabled.12"
+                          if bowtie_existente is not None
+                          else "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"),
+                    key="download_bowtie_individual",
+                )
+
+            st.caption(
+                "O download de todos gera novos BowTies .xlsx a partir da APR atualizada. "
+                "Para atualizar um BowTie já preenchido, use o envio individual acima."
+            )
+            if st.button("Preparar todos os BowTies (ZIP)", key="preparar_bowties_zip"):
+                try:
+                    with st.spinner("Gerando um arquivo Excel para cada cenário..."):
+                        memoria = io.BytesIO()
+                        revisoes = []
+                        with zipfile.ZipFile(memoria, "w", compression=zipfile.ZIP_DEFLATED) as pacote:
+                            nomes_usados = set()
+                            for c in cenarios_bowtie:
+                                arquivo, avisos = gerar_bowtie(c, atualizada)
+                                nome = nome_bowtie(c)
+                                if nome in nomes_usados:
+                                    raise ValueError(
+                                        f"Há mais de um cenário com o nome {nome}. "
+                                        "Confira os identificadores antes de baixar todos."
+                                    )
+                                nomes_usados.add(nome)
+                                pacote.writestr(nome, arquivo)
+                                if avisos:
+                                    revisoes.append(f"{nome}: " + " | ".join(avisos))
+                        st.session_state["arquivo_bowtie_zip"] = memoria.getvalue()
+                        st.session_state["assinatura_bowtie_zip"] = (
+                            assinatura_pdf(apr_atualizada), incluir_todos
+                        )
+                        st.session_state["revisoes_bowtie_zip"] = revisoes
+                    st.success(f"{len(cenarios_bowtie)} arquivos Excel preparados.")
+                except (ValueError, OSError, zipfile.BadZipFile) as erro:
+                    st.session_state.pop("arquivo_bowtie_zip", None)
+                    st.error(str(erro))
+
+            if (st.session_state.get("arquivo_bowtie_zip") is not None
+                    and st.session_state.get("assinatura_bowtie_zip")
+                    == (assinatura_pdf(apr_atualizada), incluir_todos)):
+                st.download_button(
+                    "Baixar todos os BowTies (.zip)",
+                    data=st.session_state["arquivo_bowtie_zip"],
+                    file_name="BowTies_APR_atualizada.zip",
+                    mime="application/zip",
+                    key="download_bowties_zip",
+                )
+                with st.expander("Avisos para conferência dos BowTies gerados"):
+                    for aviso in st.session_state.get("revisoes_bowtie_zip", []):
+                        st.write(aviso)

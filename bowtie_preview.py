@@ -57,6 +57,8 @@ def preparar_dados_bowtie(cenario, inventario_cenario):
     grupos = defaultdict(list)
     alertas = []
     for item in inventario_cenario:
+        if item.get("Seção na APR") == "Detecção":
+            continue
         codigo = str(item.get("Código Bow Tie", "AV") or "AV")
         descricao = str(item.get("Descrição", "") or "").strip()
         if descricao and descricao not in grupos[codigo]:

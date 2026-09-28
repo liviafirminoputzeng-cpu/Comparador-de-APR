@@ -177,16 +177,33 @@ def _candidato(
         # muito próximas. Um limite mínimo para o nome evita relacionar, por
         # exemplo, "pressão elevada" com "vazamento de lodo" apenas porque os
         # textos auxiliares são iguais.
-        if perigo >= 0.55 and causas >= 0.80 and efeitos >= 0.70:
+        nome_tecnico_compativel = bool(termos_comuns) or perigo >= 0.62
+        if (
+            perigo >= 0.55
+            and nome_tecnico_compativel
+            and causas >= 0.80
+            and efeitos >= 0.70
+        ):
             return True
-        if perigo >= 0.50 and causas >= 0.68 and efeitos >= 0.80:
+        if (
+            perigo >= 0.50
+            and nome_tecnico_compativel
+            and causas >= 0.68
+            and efeitos >= 0.80
+        ):
             return True
         # Exceção conservadora para uma troca ampla de nome: o trecho, as
         # causas e as consequências precisam permanecer praticamente iguais.
         trecho = _similaridade_texto(
             antigo["Trecho de análise"], atualizado["Trecho de análise"]
         )
-        return trecho >= 0.93 and causas >= 0.80 and efeitos >= 0.80
+        return (
+            perigo >= 0.45
+            and bool(termos_comuns)
+            and trecho >= 0.93
+            and causas >= 0.80
+            and efeitos >= 0.80
+        )
 
     migracao_especifica = bool(
         termos_comuns & {"diesel", "combustivel", "hidrogenio", "sulfurico"}
@@ -196,12 +213,68 @@ def _candidato(
     )
 
 
-def _confianca(pontuacao):
-    if pontuacao >= 0.85:
-        return "Alta"
-    if pontuacao >= 0.70:
-        return "Média"
-    return "Baixa"
+def _avaliar_correspondencia(
+    antigo,
+    atualizado,
+    pontuacao,
+    origem,
+    cenarios_antigos,
+    cenarios_atualizados,
+):
+    """Indica pares que precisam de conferência humana antes do uso final."""
+    motivos = []
+    perigo = _similaridade_texto(antigo["Perigo"], atualizado["Perigo"])
+    mesmo_sistema = _normalizar(antigo["Sistema"]) == _normalizar(
+        atualizado["Sistema"]
+    )
+
+    if pontuacao < 0.85:
+        motivos.append(f"similaridade global de {pontuacao * 100:.1f}%")
+    if perigo < 0.65:
+        motivos.append(f"nome do desvio com similaridade de {perigo * 100:.1f}%")
+    if not mesmo_sistema:
+        motivos.append("cenários localizados em sistemas diferentes")
+    if origem == "Possível unificação":
+        motivos.append("possível unificação de dois cenários antigos")
+
+    alternativas_atualizadas = sorted(
+        (
+            _pontuar(antigo, outro)
+            for outro in cenarios_atualizados
+            if outro["ID"] != atualizado["ID"] and _candidato(antigo, outro)
+        ),
+        reverse=True,
+    )
+    if alternativas_atualizadas and pontuacao - alternativas_atualizadas[0] < 0.08:
+        motivos.append("há outro cenário atual com pontuação próxima")
+
+    alternativas_antigas = sorted(
+        (
+            _pontuar(outro, atualizado)
+            for outro in cenarios_antigos
+            if outro["ID"] != antigo["ID"] and _candidato(outro, atualizado)
+        ),
+        reverse=True,
+    )
+    if alternativas_antigas and pontuacao - alternativas_antigas[0] < 0.08:
+        motivos.append("há outro cenário antigo com pontuação próxima")
+
+    motivos = list(dict.fromkeys(motivos))
+    return {
+        "revisar": bool(motivos),
+        "confianca": "REVISAR" if motivos else "Alta",
+        "motivo": "; ".join(motivos),
+    }
+
+
+def _acrescentar_aviso_revisao(item, motivo):
+    if not motivo:
+        return
+    aviso = f"REVISAR — {motivo}."
+    detalhe = str(item.get("Detalhe / comentário", "") or "").strip()
+    item["Detalhe / comentário"] = f"{aviso} {detalhe}".strip()
+    item["Validação"] = "REVISAR"
+    item["Motivo da revisão"] = motivo
 
 
 def _encontrar_correspondencias(antigos, atualizados):
@@ -950,6 +1023,15 @@ def comparar_revisoes(cenarios_antigos, cenarios_atualizados):
     ]
 
     for antigo, atualizado, pontuacao, origem in pares:
+        inicio_alteracoes_par = len(alteracoes)
+        avaliacao = _avaliar_correspondencia(
+            antigo,
+            atualizado,
+            pontuacao,
+            origem,
+            cenarios_antigos,
+            cenarios_atualizados,
+        )
         perigo_igual = _normalizar(antigo["Perigo"]) == _normalizar(
             atualizado["Perigo"]
         )
@@ -962,8 +1044,10 @@ def comparar_revisoes(cenarios_antigos, cenarios_atualizados):
                 "Perigo antigo": antigo["Perigo"].replace("\n", " "),
                 "Perigo atualizado": atualizado["Perigo"].replace("\n", " "),
                 "Correspondência": origem,
-                "Confiança": _confianca(pontuacao),
+                "Confiança": avaliacao["confianca"],
                 "Similaridade": round(pontuacao * 100, 1),
+                "Validação": "REVISAR" if avaliacao["revisar"] else "AUTOMÁTICA",
+                "Motivo da revisão": avaliacao["motivo"],
             }
         )
 
@@ -1097,8 +1181,10 @@ def comparar_revisoes(cenarios_antigos, cenarios_atualizados):
                     str(atualizado[c])
                     for c in ("Risco S", "Risco P", "Risco M", "Risco I")
                 ),
-                "Confiança": _confianca(pontuacao),
+                "Confiança": avaliacao["confianca"],
                 "Similaridade": round(pontuacao * 100, 1),
+                "Validação": "REVISAR" if avaliacao["revisar"] else "AUTOMÁTICA",
+                "Motivo da revisão": avaliacao["motivo"],
                 "Candidato Bow Tie antigo": (
                     "SIM" if candidato_bowtie(antigo) else "Não"
                 ),
@@ -1107,6 +1193,10 @@ def comparar_revisoes(cenarios_antigos, cenarios_atualizados):
                 ),
             }
         )
+
+        if avaliacao["revisar"]:
+            for item in alteracoes[inicio_alteracoes_par:]:
+                _acrescentar_aviso_revisao(item, avaliacao["motivo"])
 
     for cenario in removidos:
         correspondencias.append(
@@ -1117,12 +1207,13 @@ def comparar_revisoes(cenarios_antigos, cenarios_atualizados):
                 "Perigo antigo": cenario["Perigo"].replace("\n", " "),
                 "Perigo atualizado": "",
                 "Correspondência": "Sem par automático",
-                "Confiança": "Revisar",
+                "Confiança": "REVISAR",
                 "Similaridade": "",
+                "Validação": "REVISAR",
+                "Motivo da revisão": "não foi encontrado par automático na APR atualizada",
             }
         )
-        alteracoes.append(
-            {
+        item_removido = {
                 "ID antiga": cenario["ID"],
                 "ID atualizada": "",
                 "Sistema": cenario["Sistema"],
@@ -1133,7 +1224,11 @@ def comparar_revisoes(cenarios_antigos, cenarios_atualizados):
                 "Depois": "",
                 "Detalhe / comentário": "",
             }
+        _acrescentar_aviso_revisao(
+            item_removido,
+            "não foi encontrado par automático na APR atualizada",
         )
+        alteracoes.append(item_removido)
 
     for cenario in novos:
         correspondencias.append(
@@ -1144,12 +1239,13 @@ def comparar_revisoes(cenarios_antigos, cenarios_atualizados):
                 "Perigo antigo": "",
                 "Perigo atualizado": cenario["Perigo"].replace("\n", " "),
                 "Correspondência": "Sem par automático",
-                "Confiança": "Revisar",
+                "Confiança": "REVISAR",
                 "Similaridade": "",
+                "Validação": "REVISAR",
+                "Motivo da revisão": "não foi encontrado par automático na APR antiga",
             }
         )
-        alteracoes.append(
-            {
+        item_novo = {
                 "ID antiga": "",
                 "ID atualizada": cenario["ID"],
                 "Sistema": cenario["Sistema"],
@@ -1160,7 +1256,11 @@ def comparar_revisoes(cenarios_antigos, cenarios_atualizados):
                 "Depois": cenario["Perigo"].replace("\n", " "),
                 "Detalhe / comentário": "",
             }
+        _acrescentar_aviso_revisao(
+            item_novo,
+            "não foi encontrado par automático na APR antiga",
         )
+        alteracoes.append(item_novo)
 
     ordem_status = {
         "MANTIDO / ALTERADO": 0,
@@ -1184,6 +1284,9 @@ def comparar_revisoes(cenarios_antigos, cenarios_atualizados):
         )
     )
     resumo = Counter(item["Status"] for item in correspondencias)
+    resumo["CORRESPONDÊNCIAS A REVISAR"] = sum(
+        item.get("Validação") == "REVISAR" for item in correspondencias
+    )
     evolucao_bowtie = _analisar_evolucao_bowtie(
         cenarios_antigos,
         cenarios_atualizados,

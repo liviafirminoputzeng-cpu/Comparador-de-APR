@@ -1,8 +1,10 @@
 import re
+from copy import copy
 from collections import Counter, defaultdict
 from io import BytesIO
+from pathlib import Path
 
-from openpyxl import Workbook
+from openpyxl import Workbook, load_workbook
 from openpyxl.styles import Alignment, Border, Font, PatternFill, Side
 from openpyxl.utils import get_column_letter
 
@@ -18,6 +20,9 @@ AMARELO_CLARO = "FFF2CC"
 LARANJA = "F4B183"
 BRANCO = "FFFFFF"
 BORDA = Side(style="thin", color="B7B7B7")
+CAMINHO_MODELO = (
+    Path(__file__).resolve().parent / "assets" / "modelo_resultado_apr.xlsx"
+)
 
 
 APR_HEADERS = [
@@ -49,13 +54,6 @@ ENQUADRAMENTO_HEADERS = [
     "B7 Fonte de Ignição", "B8 Resp. Emerg. Operação", "B9 Resp. Emerg. Brigada",
     "B10 Evacuação/Abandono", "Controles de degradação / não barreira", "A avaliar",
     "Lacunas / pontos de atenção para a validação",
-]
-
-MATRIZ_HEADERS = [
-    "ID K", "Sistema", "Perigo", "Sev máx (S/P/M)", "Candidato Bow Tie",
-    "B1", "B2", "B3", "B4", "B5", "B6", "B7", "B8", "B9", "B10",
-    "Preventivas (B1–B5)", "Mitigadoras (B6–B10)",
-    "Ctrl. degradação / não barreira", "A avaliar",
 ]
 
 CANDIDATOS_HEADERS = [
@@ -298,11 +296,15 @@ def _linhas_comparativo(antigos, atuais, comparacao):
 
         nota = ""
         if id_c and id_k:
+            validacao = relacao.get("Validação", "AUTOMÁTICA")
+            motivo = relacao.get("Motivo da revisão", "")
             nota = (
                 f"{relacao.get('Correspondência', '')}; confiança "
                 f"{str(relacao.get('Confiança', '')).lower()}; "
                 f"similaridade {relacao.get('Similaridade', 0):.0f}%"
             )
+            if validacao == "REVISAR":
+                nota = f"REVISAR — {motivo}. {nota}"
 
         linha = {
             "Status": STATUS_CLARO.get(status, status),
@@ -789,61 +791,6 @@ def _criar_enquadramento(wb, cenarios, inventario):
     return ws
 
 
-def _linhas_matriz(cenarios, inventario):
-    por_id = _inventario_por_id(inventario)
-    linhas = []
-    for cenario in _ordenar_cenarios(cenarios):
-        contagens = Counter(
-            item.get("_Código Bow Tie", "AV")
-            for item in por_id.get(cenario["ID"], [])
-        )
-        linha = {
-            "ID K": cenario.get("ID", ""),
-            "Sistema": cenario.get("Sistema", ""),
-            "Perigo": _sem_marcadores(cenario.get("Perigo", "")),
-            "Sev máx (S/P/M)": _severidade_maxima(cenario),
-            "Candidato Bow Tie": "SIM" if candidato_bowtie(cenario) else "Não",
-        }
-        for codigo in [f"B{x}" for x in range(1, 11)]:
-            linha[codigo] = contagens.get(codigo, 0) or ""
-        linha["Preventivas (B1–B5)"] = sum(
-            contagens.get(f"B{x}", 0) for x in range(1, 6)
-        )
-        linha["Mitigadoras (B6–B10)"] = sum(
-            contagens.get(f"B{x}", 0) for x in range(6, 11)
-        )
-        linha["Ctrl. degradação / não barreira"] = (
-            contagens.get("CD", 0) + contagens.get("NB", 0) or ""
-        )
-        linha["A avaliar"] = contagens.get("AV", 0) or ""
-        linhas.append(linha)
-    return linhas
-
-
-def _criar_matriz(wb, cenarios, inventario):
-    ws = wb.create_sheet("Matriz_Barreiras")
-    larguras = {"A": 9, "B": 29, "C": 38, "D": 16, "E": 16}
-    for coluna in range(6, 16):
-        larguras[get_column_letter(coluna)] = 7
-    larguras.update({"P": 20, "Q": 21, "R": 22, "S": 14})
-    linhas = _linhas_matriz(cenarios, inventario)
-    ultima = _escrever_tabela(ws, MATRIZ_HEADERS, linhas, "D2", larguras)
-    total = ultima + 1
-    ws.cell(total, 1, "TOTAL")
-    ws.cell(total, 5, f'=COUNTIF(E2:E{ultima},"SIM")')
-    for coluna in range(6, 20):
-        letra = get_column_letter(coluna)
-        ws.cell(total, coluna, f"=SUM({letra}2:{letra}{ultima})")
-    for coluna in range(1, 20):
-        _cabecalho(ws.cell(total, coluna), AZUL)
-    ws.auto_filter.ref = f"A1:S{ultima}"
-    for linha in range(2, ultima + 1):
-        if ws.cell(linha, 5).value == "SIM":
-            ws.cell(linha, 5).fill = PatternFill("solid", fgColor=LARANJA)
-            ws.cell(linha, 5).font = Font(name="Aptos", size=9, bold=True)
-    return ws
-
-
 def _criar_leia_me(wb, antiga, atualizada, codigo_c, codigo_k):
     ws = wb.active
     ws.title = "Leia-me"
@@ -869,19 +816,15 @@ def _criar_leia_me(wb, antiga, atualizada, codigo_c, codigo_k):
         ),
         (
             f"Aba APR_Rev{codigo_c} / APR_Rev{codigo_k}",
-            "Conversão das APRs para Excel, um cenário por linha, com frequência, severidade, risco e indicação de candidato a Bow Tie.",
+            "Conversão das planilhas APR para Excel, um cenário por linha. As salvaguardas foram desmembradas em Modo de Detecção, Preventivas (SP) e Mitigadoras (SM). Colunas F (frequência), Severidade e Risco por dimensão: S=Segurança/Pessoas, P=Patrimônio, M=Meio Ambiente, I=Imagem.",
         ),
         (
             "Aba Comparativo",
             "Cenários lado a lado. Sem par = REMOVIDO ou NOVO. As colunas Δ mostram mudanças de frequência, severidade, risco, causas, efeitos e salvaguardas.",
         ),
         (
-            "Aba Candidatos_BowTie",
-            "Lista os candidatos atuais, os novos candidatos e os cenários que deixaram de atender ao critério, sempre em ordem de nó.",
-        ),
-        (
             "Aba Alterações",
-            "Lista analítica, uma linha por alteração detectada. Use o filtro da coluna Tipo de alteração.",
+            "Lista analítica, uma linha por alteração detectada. A linha inteira fica verde para inclusão, vermelha para exclusão e amarela para alteração. Casos incertos são identificados como REVISAR no campo Detalhe / comentário.",
         ),
         (
             "Aba Salvaguardas",
@@ -891,14 +834,10 @@ def _criar_leia_me(wb, antiga, atualizada, codigo_c, codigo_k):
             "Aba Enquadramento_BowTie",
             "Visão por cenário da revisão vigente, com salvaguardas agrupadas por barreira e lacunas para validação.",
         ),
-        (
-            "Aba Matriz_Barreiras",
-            "Quantidade de elementos B1–B10 por cenário. Células vazias destacam barreiras sem elemento identificado.",
-        ),
         ("Aba Resumo", "Indicadores consolidados por revisão, tipo de alteração, barreira e nó."),
         (
-            "Critério Bow Tie",
-            "Candidato quando há severidade IV ou V em Segurança/Pessoas, Patrimônio ou Meio Ambiente, conforme o Guia Bow Tie rev.7.",
+            "Regras de enquadramento (IT Anexo 1D)",
+            "Falha de montagem/material inadequado: sem barreira preventiva efetiva. Corrosão: considerar somente a proteção técnica aplicável. Consequências sem incêndio/explosão: não alocar barreiras de resposta ao fogo. Planos, procedimentos, treinamentos, FISPQ, sinalização e controle de acesso são controles de degradação/gestão, salvo quando vinculados a uma função de barreira comprovada.",
         ),
         (
             "Status do enquadramento",
@@ -1044,6 +983,261 @@ def _criar_resumo(
     return ws
 
 
+def _cor_preenchimento(celula):
+    cor = celula.fill.fgColor
+    return (cor.rgb or "").upper()
+
+
+def _copiar_estilo(origem, destino):
+    destino.font = copy(origem.font)
+    destino.fill = copy(origem.fill)
+    destino.border = copy(origem.border)
+    destino.alignment = copy(origem.alignment)
+    destino.number_format = origem.number_format
+    destino.protection = copy(origem.protection)
+
+
+def _copiar_configuracao_planilha(modelo, destino):
+    destino.sheet_view.showGridLines = modelo.sheet_view.showGridLines
+    destino.sheet_view.zoomScale = modelo.sheet_view.zoomScale
+    destino.freeze_panes = modelo.freeze_panes
+    destino.sheet_format = copy(modelo.sheet_format)
+    destino.sheet_properties = copy(modelo.sheet_properties)
+    destino.page_margins = copy(modelo.page_margins)
+    destino.page_setup = copy(modelo.page_setup)
+    destino.print_options = copy(modelo.print_options)
+    destino.sheet_state = modelo.sheet_state
+    destino.print_title_rows = modelo.print_title_rows
+    destino.print_title_cols = modelo.print_title_cols
+
+    for letra, dimensao in modelo.column_dimensions.items():
+        alvo = destino.column_dimensions[letra]
+        alvo.width = dimensao.width
+        alvo.hidden = dimensao.hidden
+        alvo.bestFit = dimensao.bestFit
+        alvo.outlineLevel = dimensao.outlineLevel
+
+
+def _copiar_estilos_fixos(modelo, destino, linhas, colunas):
+    for linha in range(1, linhas + 1):
+        for coluna in range(1, colunas + 1):
+            _copiar_estilo(modelo.cell(linha, coluna), destino.cell(linha, coluna))
+        if modelo.row_dimensions[linha].height is not None:
+            destino.row_dimensions[linha].height = modelo.row_dimensions[linha].height
+
+
+def _altura_conteudo(ws, linha, colunas, minimo=22.8, maximo=159.6):
+    maior = 1
+    for coluna in range(1, colunas + 1):
+        valor = ws.cell(linha, coluna).value
+        if valor is not None:
+            maior = max(maior, str(valor).count("\n") + 1)
+    return min(maximo, max(minimo, maior * 11.4))
+
+
+def _linha_por_valor(ws, coluna, valor, inicio=2):
+    for linha in range(inicio, ws.max_row + 1):
+        if str(ws.cell(linha, coluna).value or "").strip() == valor:
+            return linha
+    return inicio
+
+
+def _aplicar_estilo_linha(modelo, destino, linha_modelo, linha_destino, colunas):
+    for coluna in range(1, colunas + 1):
+        _copiar_estilo(
+            modelo.cell(linha_modelo, coluna),
+            destino.cell(linha_destino, coluna),
+        )
+
+
+def _aplicar_modelo_apr(modelo, destino):
+    _copiar_configuracao_planilha(modelo, destino)
+    _copiar_estilos_fixos(modelo, destino, 1, 25)
+    candidato_modelo = next(
+        (
+            linha
+            for linha in range(2, modelo.max_row + 1)
+            if str(modelo.cell(linha, 24).value or "").upper() == "SIM"
+        ),
+        2,
+    )
+    for linha in range(2, destino.max_row + 1):
+        _aplicar_estilo_linha(modelo, destino, 2, linha, 25)
+        if str(destino.cell(linha, 24).value or "").upper() == "SIM":
+            _copiar_estilo(
+                modelo.cell(candidato_modelo, 24), destino.cell(linha, 24)
+            )
+        destino.row_dimensions[linha].height = _altura_conteudo(
+            destino, linha, 25
+        )
+
+
+def _aplicar_modelo_comparativo(modelo, destino):
+    _copiar_configuracao_planilha(modelo, destino)
+    _copiar_estilos_fixos(modelo, destino, 2, 48)
+
+    linha_removido = _linha_por_valor(modelo, 1, "REMOVIDO", 3)
+    linha_novo = _linha_por_valor(modelo, 1, "NOVO", 3)
+    estilo_base = modelo.cell(3, 2)
+    estilo_alterado = modelo.cell(3, 1)
+    estilo_removido = modelo.cell(linha_removido, 1)
+    estilo_novo = modelo.cell(linha_novo, 1)
+    estilo_candidato = next(
+        (
+            modelo.cell(linha, 47)
+            for linha in range(3, modelo.max_row + 1)
+            if _cor_preenchimento(modelo.cell(linha, 47)) == "FFF8CBAD"
+        ),
+        modelo.cell(3, 47),
+    )
+
+    estilos_risco = {}
+    for linha in range(3, modelo.max_row + 1):
+        for coluna in range(29, 37):
+            valor = str(modelo.cell(linha, coluna).value or "").strip().upper()
+            if valor and _cor_preenchimento(modelo.cell(linha, coluna)):
+                estilos_risco.setdefault(valor, modelo.cell(linha, coluna))
+
+    for linha in range(3, destino.max_row + 1):
+        status = str(destino.cell(linha, 1).value or "").upper()
+        removido = "REMOVIDO" in status
+        novo = "NOVO" in status
+        estilo_linha = estilo_removido if removido else estilo_novo if novo else estilo_base
+        for coluna in range(1, 49):
+            _copiar_estilo(estilo_linha, destino.cell(linha, coluna))
+
+        if not removido and not novo:
+            _copiar_estilo(estilo_alterado, destino.cell(linha, 1))
+            for coluna in range(39, 47):
+                if destino.cell(linha, coluna).value not in (None, ""):
+                    _copiar_estilo(estilo_alterado, destino.cell(linha, coluna))
+            if str(destino.cell(linha, 47).value or "").upper() == "SIM":
+                _copiar_estilo(estilo_candidato, destino.cell(linha, 47))
+
+        for coluna in range(29, 37):
+            valor = str(destino.cell(linha, coluna).value or "").strip().upper()
+            if valor in estilos_risco:
+                _copiar_estilo(estilos_risco[valor], destino.cell(linha, coluna))
+
+        destino.row_dimensions[linha].height = _altura_conteudo(
+            destino, linha, 48
+        )
+
+
+def _tipo_cor_alteracao(tipo):
+    texto = str(tipo or "").casefold()
+    if "incluíd" in texto or "novo" in texto:
+        return "verde"
+    if "excluíd" in texto or "removido" in texto:
+        return "vermelho"
+    return "amarelo"
+
+
+def _aplicar_modelo_alteracoes(modelo, destino):
+    _copiar_configuracao_planilha(modelo, destino)
+    _copiar_estilos_fixos(modelo, destino, 1, 9)
+    prototipos = {}
+    for linha in range(2, modelo.max_row + 1):
+        cor = _cor_preenchimento(modelo.cell(linha, 1))
+        if cor == "FFC6EFCE":
+            prototipos.setdefault("verde", linha)
+        elif cor == "FFFFC7CE":
+            prototipos.setdefault("vermelho", linha)
+        elif cor == "FFFFEB9C":
+            prototipos.setdefault("amarelo", linha)
+    for linha in range(2, destino.max_row + 1):
+        chave = _tipo_cor_alteracao(destino.cell(linha, 2).value)
+        _aplicar_estilo_linha(
+            modelo, destino, prototipos.get(chave, 2), linha, 9
+        )
+        cor_linha = {
+            "verde": "C6EFCE",
+            "vermelho": "FFC7CE",
+            "amarelo": "FFEB9C",
+        }[chave]
+        for coluna in range(1, 10):
+            destino.cell(linha, coluna).fill = PatternFill(
+                "solid", fgColor=cor_linha
+            )
+        destino.row_dimensions[linha].height = _altura_conteudo(
+            destino, linha, 9
+        )
+
+
+def _aplicar_modelo_salvaguardas(modelo, destino, codigo_c, codigo_k):
+    _copiar_configuracao_planilha(modelo, destino)
+    _copiar_estilos_fixos(modelo, destino, 1, 16)
+    linha_c = _linha_por_valor(modelo, 1, "Rev C", 2)
+    linha_k = _linha_por_valor(modelo, 1, "Rev K", 2)
+    for linha in range(2, destino.max_row + 1):
+        revisao = str(destino.cell(linha, 1).value or "")
+        prototipo = linha_c if revisao == f"Rev {codigo_c}" else linha_k
+        _aplicar_estilo_linha(modelo, destino, prototipo, linha, 16)
+        destino.row_dimensions[linha].height = _altura_conteudo(
+            destino, linha, 16
+        )
+
+
+def _aplicar_modelo_enquadramento(modelo, destino):
+    _copiar_configuracao_planilha(modelo, destino)
+    _copiar_estilos_fixos(modelo, destino, 1, 23)
+    linha_nao = _linha_por_valor(modelo, 10, "Não", 2)
+    linha_sim = _linha_por_valor(modelo, 10, "SIM", 2)
+    for linha in range(2, destino.max_row + 1):
+        prototipo = (
+            linha_sim
+            if str(destino.cell(linha, 10).value or "").upper() == "SIM"
+            else linha_nao
+        )
+        _aplicar_estilo_linha(modelo, destino, prototipo, linha, 23)
+        destino.row_dimensions[linha].height = _altura_conteudo(
+            destino, linha, 23
+        )
+
+
+def _aplicar_modelo_visual(wb, nome_c, nome_k, codigo_c, codigo_k):
+    if not CAMINHO_MODELO.exists():
+        raise FileNotFoundError(
+            f"Modelo visual não encontrado: {CAMINHO_MODELO.name}"
+        )
+
+    referencia = load_workbook(CAMINHO_MODELO, data_only=False)
+    mapeamento = {
+        "Leia-me": "Leia-me",
+        "Resumo": "Resumo",
+        nome_c: "APR_RevC",
+        nome_k: "APR_RevK",
+        "Comparativo": "Comparativo",
+        "Alterações": "Alterações",
+        "Salvaguardas": "Salvaguardas",
+        "Enquadramento_BowTie": "Enquadramento_BowTie",
+    }
+
+    _copiar_configuracao_planilha(referencia["Leia-me"], wb["Leia-me"])
+    _copiar_estilos_fixos(referencia["Leia-me"], wb["Leia-me"], 15, 2)
+    _copiar_configuracao_planilha(referencia["Resumo"], wb["Resumo"])
+    _copiar_estilos_fixos(referencia["Resumo"], wb["Resumo"], 56, 3)
+    _aplicar_modelo_apr(referencia["APR_RevC"], wb[nome_c])
+    _aplicar_modelo_apr(referencia["APR_RevK"], wb[nome_k])
+    _aplicar_modelo_comparativo(
+        referencia["Comparativo"], wb["Comparativo"]
+    )
+    _aplicar_modelo_alteracoes(
+        referencia["Alterações"], wb["Alterações"]
+    )
+    _aplicar_modelo_salvaguardas(
+        referencia["Salvaguardas"], wb["Salvaguardas"], codigo_c, codigo_k
+    )
+    _aplicar_modelo_enquadramento(
+        referencia["Enquadramento_BowTie"], wb["Enquadramento_BowTie"]
+    )
+    for nome_destino, nome_modelo in mapeamento.items():
+        ws = wb[nome_destino]
+        modelo = referencia[nome_modelo]
+        ws.auto_filter.ref = ws.auto_filter.ref
+        ws.sheet_properties.tabColor = copy(modelo.sheet_properties.tabColor)
+
+
 def gerar_excel(antiga, atualizada, comparacao):
     codigo_c = _codigo_revisao(antiga, "C")
     codigo_k = _codigo_revisao(atualizada, "K")
@@ -1060,7 +1254,6 @@ def gerar_excel(antiga, atualizada, comparacao):
     _criar_resumo(
         wb, antiga, atualizada, comparacao, inv_c, inv_k, codigo_c, codigo_k
     )
-    _criar_candidatos(wb, comparacao["evolucao_bowtie"])
     _criar_apr(wb, nome_c, antiga["cenarios"])
     _criar_apr(wb, nome_k, atualizada["cenarios"])
     _criar_comparativo(
@@ -1069,7 +1262,7 @@ def gerar_excel(antiga, atualizada, comparacao):
     _criar_alteracoes(wb, comparacao["alteracoes"])
     _criar_salvaguardas(wb, inv_c + inv_k)
     _criar_enquadramento(wb, atualizada["cenarios"], inv_k)
-    _criar_matriz(wb, atualizada["cenarios"], inv_k)
+    _aplicar_modelo_visual(wb, nome_c, nome_k, codigo_c, codigo_k)
 
     wb.calculation.fullCalcOnLoad = True
     wb.calculation.forceFullCalc = True
