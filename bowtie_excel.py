@@ -177,6 +177,23 @@ def _escrever(raiz, endereco, texto):
         c.attrib.pop("t", None)
 
 
+def _ligar_id(raiz, endereco, id_bowtie):
+    """Vincula um ID à célula central da BT e mantém cache legível no Excel."""
+    valor = _texto(id_bowtie).upper()
+    if not valor:
+        raise ValueError("O ID do cenário não foi identificado na APR.")
+    cel = _celula(raiz, endereco, criar=True)
+    for filho in list(cel):
+        if filho.tag in {f"{{{NS}}}v", f"{{{NS}}}is", f"{{{NS}}}f"}:
+            cel.remove(filho)
+    if re.fullmatch(r"\d+", valor):
+        cel.attrib.pop("t", None)
+    else:
+        cel.set("t", "str")
+    etree.SubElement(cel, f"{{{NS}}}f").text = "BT!$W$5"
+    etree.SubElement(cel, f"{{{NS}}}v").text = valor
+
+
 def _shared(z):
     if "xl/sharedStrings.xml" not in z.namelist():
         return []
@@ -383,7 +400,7 @@ def _retirar_modos_deteccao(raiz, strings, cenarios, revisar, grupo):
             revisar.append(f"{grupo}, linha {linha}: modo de detecção removido do BowTie.")
 
 
-def _preencher_consolidacao(raiz, folhas, strings):
+def _preencher_consolidacao(raiz, folhas, strings, id_bowtie):
     """Lista barreiras ativas sem as 550 fórmulas matriciais voláteis do modelo."""
     itens = []
     total_anterior = 0
@@ -417,7 +434,10 @@ def _preencher_consolidacao(raiz, folhas, strings):
                 valor = _valor(registro[2], f"{origem}{registro[3]}", strings)
             else:
                 valor = ""
-            _escrever(raiz, f"{destino}{pos}", valor)
+            if registro and destino == "I":
+                _ligar_id(raiz, f"I{pos}", id_bowtie)
+            else:
+                _escrever(raiz, f"{destino}{pos}", valor)
     if ultima > 51:
         dim = raiz.find(f"{{{NS}}}dimension")
         if dim is not None:
@@ -544,7 +564,10 @@ def gerar_bowtie(cenario, apr_atualizada, modelo=None, cenario_antigo=None):
     _escrever(bt, "C4", f"NÓ {no} - {sistema}")
     _escrever(bt, "Z6", perigo)
     _preencher_bt_existente(bt, causas, efeitos, perigo)
-    for ref in ("V5", "V6", "W5", "W6", "Z5", "Z7", "Z8", "Z9", "Z10"):
+    id_bowtie = _valor(bt, "W5", strings) or _texto(cenario.get("ID", ""))
+    if not _valor(bt, "W5", strings):
+        _escrever(bt, "W5", id_bowtie)
+    for ref in ("V5", "V6", "W6", "Z5", "Z7", "Z8", "Z9", "Z10"):
         _escrever(bt, ref, "")
     antigos = defaultdict(list)
     if cenario_antigo is not None:
@@ -572,11 +595,14 @@ def gerar_bowtie(cenario, apr_atualizada, modelo=None, cenario_antigo=None):
         _preencher_barreiras(folha, grupos[codigo], strings,
                             antigos[codigo] if cenario_antigo is not None else None,
                             relatorio, cenario.get("Página PDF", ""), revisar, codigo)
+        for linha in range(2, 1001):
+            if _valor(folha, f"C{linha}", strings):
+                _ligar_id(folha, f"B{linha}", id_bowtie)
         _enxugar_linhas_vazias(folha, 2, "L")
         folhas_barreiras[codigo] = folha
         alteradas[path] = etree.tostring(folha, encoding="UTF-8", xml_declaration=True, standalone=True)
     resumo = _arvore(z, abas["BT - Todos"])
-    _preencher_consolidacao(resumo, folhas_barreiras, strings)
+    _preencher_consolidacao(resumo, folhas_barreiras, strings, id_bowtie)
     _enxugar_linhas_vazias(resumo, 12, "R")
     alteradas[abas["BT - Todos"]] = etree.tostring(resumo, encoding="UTF-8", xml_declaration=True, standalone=True)
     _enxugar_linhas_vazias(bt, 7, "AJ")
@@ -588,7 +614,8 @@ def gerar_bowtie(cenario, apr_atualizada, modelo=None, cenario_antigo=None):
     calc = livro.find(f"{{{NS}}}calcPr")
     if calc is None:
         calc = etree.SubElement(livro, f"{{{NS}}}calcPr")
-    calc.set("fullCalcOnLoad", "0")
+    calc.set("calcMode", "auto")
+    calc.set("fullCalcOnLoad", "1")
     calc.set("forceFullCalc", "0")
     puladas = _retirar_vinculo_sap(z, livro, folhas_barreiras, alteradas)
     puladas |= _retirar_indice_formulas(z, alteradas)

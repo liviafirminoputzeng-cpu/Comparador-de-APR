@@ -570,6 +570,38 @@ def classificar_salvaguarda_bowtie(descricao, secao_apr="", cenario=None):
     cenario = cenario or {}
     texto = _normalizar(descricao)
     secao = _normalizar(secao_apr)
+    codigo_apr = _codigo_item(str(descricao or ""))
+    # Associações explícitas fornecidas pela equipe. Exige código E descrição
+    # correspondente para que um código reutilizado em outra APR não seja
+    # transferido automaticamente para uma aba incorreta.
+    regras_explicitas = (
+        ("SP19", "procedimento de execucao", "B1"),
+        ("SP13", "spda", "B1"),
+        ("SP13", "descargas atmosfericas", "B1"),
+        ("SP45", "drenagem da area de descarregamento", "B1"),
+        ("SM1", "brigada", "B9"),
+        ("SM4", "dique de contencao", "B6"),
+        ("SM10", "kit de protecao ambiental", "B6"),
+        ("SM8", "diphoterine", "B6"),
+    )
+    destino = next(
+        (aba for codigo, termo, aba in regras_explicitas
+         if codigo == codigo_apr and termo in texto),
+        None,
+    )
+    if destino is None and "procedimento operacional de emergencia" in texto:
+        destino = "B8"
+    if destino is not None:
+        nome, tipo, _ = BARREIRAS_BOWTIE[destino]
+        return {
+            "Código Bow Tie": destino,
+            "Nome da barreira": nome,
+            "Tipo Bow Tie": tipo,
+            "Confiança": "Alta",
+            "Justificativa": "Associação explícita informada para este projeto.",
+            "Alerta": "",
+            "Base normativa": "Regra de classificação informada pela equipe",
+        }
     codigo = "AV"
     confianca = "Baixa"
     justificativa = (

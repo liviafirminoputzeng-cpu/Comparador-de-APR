@@ -16,6 +16,7 @@ from lxml import etree
 from bowtie_excel import (
     NS, PCK, REL, _arvore, _celula, _escrever, _grupo_itens, _itens, _texto,
     _valor, _maiusculas_aba, _maiusculas_compartilhadas, _tag_e_descricao,
+    _ligar_id,
 )
 
 
@@ -167,13 +168,16 @@ def _proxima_linha(raiz, inicio, usados):
     raise ValueError("Não há linhas disponíveis para registrar todas as salvaguardas da APR.")
 
 
-def _inserir_barreiras(raiz, codigo, itens, referencia, estilos, cache):
+def _inserir_barreiras(raiz, codigo, itens, referencia, estilos, cache, id_bowtie):
     """Escreve somente informações literalmente presentes na APR."""
     usados = set()
     for descricao_original in itens:
         tag, descricao = _tag_e_descricao(descricao_original)
         linha = _proxima_linha(raiz, 2, usados)
         usados.add(linha)
+        _ligar_id(raiz, f"B{linha}", id_bowtie)
+        if linha > 2:
+            _copiar_cor_da_linha(raiz, f"B{linha}", "B2")
         _escrever(raiz, f"C{linha}", codigo)
         _copiar_cor_da_linha(raiz, f"C{linha}", "C2")
         if tag:
@@ -259,11 +263,16 @@ def gerar_bowtie_novo(cenario, apr):
         _escrever(bt, "C1", f"CASO: SISTEMA APR - NÓ {no} - {sistema}")
         _escrever(bt, "C2", f"CENÁRIO {cenario.get('ID', '')} - APR - {relatorio}")
         _escrever(bt, "C4", f"NÓ {no} - {sistema}")
+        id_bowtie = _texto(cenario.get("ID", ""))
+        _escrever(bt, "W4", "ID")
+        _escrever(bt, "W5", id_bowtie)
         ameaças = _itens(cenario.get("Causas", ""))
         consequencias = _itens(cenario.get("Possíveis efeitos", ""))
         _linhas_da_bt(bt, ameaças, consequencias)
         _escrever(bt, "I7", _texto(cenario.get("Perigo", "")).replace("\n", " "))
-        _ajustar_tamanho_tabela(bt, max(7, 6 + len(ameaças), 6 + len(consequencias)))
+        ultima_bt = max(7, 6 + len(ameaças), 6 + len(consequencias))
+        _ajustar_tamanho_tabela(bt, ultima_bt)
+        bt.find(f"{{{NS}}}dimension").set("ref", f"A1:W{ultima_bt}")
         alteradas[mapas["BT"]] = bt
 
         pagina = cenario.get("Página PDF", "")
@@ -279,7 +288,7 @@ def gerar_bowtie_novo(cenario, apr):
             itens = pendentes if nome == "A_conferir" else grupos.get(nome, [])
             if itens:
                 _inserir_barreiras(folha, "REVISAR" if nome == "A_conferir" else nome,
-                                   itens, fonte, estilos, cache_estilos)
+                                   itens, fonte, estilos, cache_estilos, id_bowtie)
             preenchidas = [
                 int(linha.get("r"))
                 for linha in folha.findall(f".//{{{NS}}}sheetData/{{{NS}}}row")
@@ -294,6 +303,10 @@ def gerar_bowtie_novo(cenario, apr):
             _maiusculas_aba(folha)
         _maiusculas_compartilhadas(z, alteradas)
 
+        calc = wb.find(f"{{{NS}}}calcPr")
+        if calc is not None:
+            calc.set("calcMode", "auto")
+            calc.set("fullCalcOnLoad", "1")
         alteradas["xl/workbook.xml"] = wb
         alteradas["xl/_rels/workbook.xml.rels"] = rels
         alteradas["[Content_Types].xml"] = tipos
