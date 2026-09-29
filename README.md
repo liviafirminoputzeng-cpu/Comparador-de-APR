@@ -5,7 +5,7 @@
 No topo do site, selecione **Comparador de APR** ou **Acompanhamento de BowTies**.
 O comparador continua gerando os arquivos anteriores. Na área de acompanhamento,
 usuários autorizados entram com o Google e abrem as planilhas de projeto guardadas
-na [pasta PUTZ indicada](https://drive.google.com/drive/folders/1bZwWMoHZgZ72g2WPO8febVnqaAHS2NkP?usp=sharing).
+na [pasta PUTZ indicada](https://drive.google.com/drive/folders/1ichy39_gjGtfzALO66pe275YxY-HdRSh?usp=drive_link).
 Após extrair e comparar as duas APRs, o coordenador pode clicar em
 **Criar planilha de acompanhamento**: o site copia o modelo `Painel`, `Controle`,
 `Equipe`, preenche os candidatos da APR atualizada e salva um Excel `.xlsx`

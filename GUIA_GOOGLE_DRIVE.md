@@ -1,6 +1,6 @@
 # Ligar o acompanhamento de BowTies à pasta da PUTZ
 
-Pasta de destino: https://drive.google.com/drive/folders/1bZwWMoHZgZ72g2WPO8febVnqaAHS2NkP?usp=sharing
+Pasta de destino: https://drive.google.com/drive/folders/1ichy39_gjGtfzALO66pe275YxY-HdRSh?usp=drive_link
 
 O ID dessa pasta já está em `drive_acompanhamento.py`. O botão cria um `.xlsx`
 por projeto e par de APRs. Na pasta, os analistas com permissão de **Editor**

@@ -28,10 +28,9 @@ st.set_page_config(
 )
 
 area = st.radio(
-    "Área do site",
+    "Escolha uma área do site",
     ["Comparador de APR", "Acompanhamento de BowTies"],
     horizontal=True,
-    label_visibility="collapsed",
     key="area_site",
 )
 if area == "Acompanhamento de BowTies":

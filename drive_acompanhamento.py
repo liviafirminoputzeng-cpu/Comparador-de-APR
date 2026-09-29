@@ -10,7 +10,7 @@ from googleapiclient.http import MediaIoBaseUpload
 
 ESCOPO = "https://www.googleapis.com/auth/drive"
 MIME_XLSX = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
-PASTA_PADRAO = "1bZwWMoHZgZ72g2WPO8febVnqaAHS2NkP"
+PASTA_PADRAO = "1ichy39_gjGtfzALO66pe275YxY-HdRSh"
 
 
 def cliente_drive(configuracao):
