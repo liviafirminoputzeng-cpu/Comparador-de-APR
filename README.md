@@ -1,12 +1,23 @@
 # Comparador de APR e BowTies por cenário
 
-Na página inicial há dois acessos: **Comparador de APR** e **Acompanhamento de
-BowTies**. O comparador preserva a comparação, os Excel e os BowTies abaixo.
-O acompanhamento mantém projetos independentes, atribuições, andamento,
-painel e histórico em um PostgreSQL compartilhado. Essa área não gera Excel.
-Para configurá-la, siga [GUIA_ACOMPANHAMENTO.md](GUIA_ACOMPANHAMENTO.md)
-antes de liberá-la à equipe. Sem banco e login configurados, o comparador
-continua disponível.
+## Nova área: Acompanhamento de BowTies no Google Drive
+
+No topo do site, selecione **Comparador de APR** ou **Acompanhamento de BowTies**.
+O comparador continua gerando os arquivos anteriores. Na área de acompanhamento,
+usuários autorizados entram com o Google e abrem as planilhas de projeto guardadas
+na [pasta PUTZ indicada](https://drive.google.com/drive/folders/1bZwWMoHZgZ72g2WPO8febVnqaAHS2NkP?usp=sharing).
+Após extrair e comparar as duas APRs, o coordenador pode clicar em
+**Criar planilha de acompanhamento**: o site copia o modelo `Painel`, `Controle`,
+`Equipe`, preenche os candidatos da APR atualizada e salva um Excel `.xlsx`
+diretamente nessa pasta. Clique em **Abrir esta planilha online** para editar
+o mesmo arquivo com a equipe. A aba de acompanhamento não oferece download.
+O mesmo nome de projeto e o mesmo par de PDFs reutilizam a planilha existente;
+os dados que a equipe já lançou não são substituídos.
+
+Antes de publicar, configure os Secrets e as permissões conforme
+[`GUIA_GOOGLE_DRIVE.md`](GUIA_GOOGLE_DRIVE.md). O link da pasta sozinho não
+autoriza a gravação. Sem Secrets, o comparador ainda funciona e a área do Drive
+mostra um aviso de configuração.
 
 ## O que o site entrega
 

@@ -27,15 +27,15 @@ st.set_page_config(
     layout="wide",
 )
 
-# As áreas compartilham o site, mas somente o acompanhamento usa a base persistente.
 area = st.radio(
     "Área do site",
     ["Comparador de APR", "Acompanhamento de BowTies"],
     horizontal=True,
-    key="area_principal",
+    label_visibility="collapsed",
+    key="area_site",
 )
 if area == "Acompanhamento de BowTies":
-    from acompanhamento_ui import mostrar_acompanhamento
+    from acompanhamento_drive_ui import mostrar_acompanhamento
 
     mostrar_acompanhamento()
     st.stop()
