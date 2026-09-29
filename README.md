@@ -1,5 +1,13 @@
 # Comparador de APR e BowTies por cenário
 
+Na página inicial há dois acessos: **Comparador de APR** e **Acompanhamento de
+BowTies**. O comparador preserva a comparação, os Excel e os BowTies abaixo.
+O acompanhamento mantém projetos independentes, atribuições, andamento,
+painel e histórico em um PostgreSQL compartilhado. Essa área não gera Excel.
+Para configurá-la, siga [GUIA_ACOMPANHAMENTO.md](GUIA_ACOMPANHAMENTO.md)
+antes de liberá-la à equipe. Sem banco e login configurados, o comparador
+continua disponível.
+
 ## O que o site entrega
 
 - Um Excel com a comparação entre as duas versões da APR e os candidatos a BowTie.

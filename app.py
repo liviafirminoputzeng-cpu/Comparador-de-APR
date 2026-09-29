@@ -27,6 +27,19 @@ st.set_page_config(
     layout="wide",
 )
 
+# As áreas compartilham o site, mas somente o acompanhamento usa a base persistente.
+area = st.radio(
+    "Área do site",
+    ["Comparador de APR", "Acompanhamento de BowTies"],
+    horizontal=True,
+    key="area_principal",
+)
+if area == "Acompanhamento de BowTies":
+    from acompanhamento_ui import mostrar_acompanhamento
+
+    mostrar_acompanhamento()
+    st.stop()
+
 CAMINHO_CAPA = Path(__file__).resolve().parent / "assets" / "putz_identidade.webp"
 capa = (
     f"data:image/webp;base64,{base64.b64encode(CAMINHO_CAPA.read_bytes()).decode('ascii')}"
