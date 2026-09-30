@@ -62,7 +62,10 @@ def gerar_planilha_acompanhamento(apr_atualizada, projeto):
             controle.cell(indice, 10).value = "A definir"
             pagina = cenario.get("Página PDF")
             controle.cell(indice, 20).value = pagina if pagina else None
-        controle.tables["BowTiesRevK"].ref = f"A8:T{8 + len(cenarios)}"
+        tabela = controle.tables["BowTiesRevK"]
+        tabela.ref = f"A8:T{8 + len(cenarios)}"
+        if tabela.autoFilter is not None:
+            tabela.autoFilter.ref = tabela.ref
         relatorio = str(apr_atualizada.get("relatorio") or "Relatório não identificado")
         fonte = str(apr_atualizada.get("nome_arquivo") or "APR atualizada")
         painel["B3"] = f"{relatorio} · {len(cenarios)} candidatos iniciais · {projeto}"
