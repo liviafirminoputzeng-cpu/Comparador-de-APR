@@ -1,23 +1,29 @@
 # Comparador de APR e BowTies por cenário
 
-## Nova área: Acompanhamento de BowTies no Google Drive
+## Acompanhamento de BowTies sem conexão à API do Drive
 
-No topo do site, selecione **Comparador de APR** ou **Acompanhamento de BowTies**.
-O comparador continua gerando os arquivos anteriores. Na área de acompanhamento,
-usuários autorizados entram com o Google e abrem as planilhas de projeto guardadas
-na [pasta PUTZ indicada](https://drive.google.com/drive/folders/1ichy39_gjGtfzALO66pe275YxY-HdRSh?usp=drive_link).
-Após extrair e comparar as duas APRs, o coordenador pode clicar em
-**Criar planilha de acompanhamento**: o site copia o modelo `Painel`, `Controle`,
-`Equipe`, preenche os candidatos da APR atualizada e salva um Excel `.xlsx`
-diretamente nessa pasta. Clique em **Abrir esta planilha online** para editar
-o mesmo arquivo com a equipe. A aba de acompanhamento não oferece download.
-O mesmo nome de projeto e o mesmo par de PDFs reutilizam a planilha existente;
-os dados que a equipe já lançou não são substituídos.
+No topo, selecione **Comparador de APR** ou **Acompanhamento de BowTies**.
+Após extrair e comparar as duas APRs, a aba **Gerar planilha Excel** oferece
+um download `.xlsx` por projeto com os candidatos da APR atualizada. A planilha
+copia as abas `Painel`, `Controle` e `Equipe` do modelo enviado e mantém suas
+cores, validações, fórmulas e gráfico. O site não define responsável, datas
+ou se um BowTie existente precisará de correção; a equipe preencherá isso.
 
-Antes de publicar, configure os Secrets e as permissões conforme
-[`GUIA_GOOGLE_DRIVE.md`](GUIA_GOOGLE_DRIVE.md). O link da pasta sozinho não
-autoriza a gravação. Sem Secrets, o comparador ainda funciona e a área do Drive
-mostra um aviso de configuração.
+O coordenador envia o Excel à
+[pasta compartilhada da PUTZ](https://drive.google.com/drive/folders/1ichy39_gjGtfzALO66pe275YxY-HdRSh?usp=drive_link)
+manualmente e copia o link do arquivo. Na aba **Planilhas compartilhadas**,
+pode colar nome do projeto e link. A tela prepara o arquivo
+`links_acompanhamento.json` atualizado; para que o link apareça a toda a equipe
+mesmo depois de reiniciar o site, substitua esse arquivo no repositório GitHub
+e faça o commit. O site apenas lê esse catálogo: não grava dados persistentes
+no servidor. Consulte [`GUIA_ACOMPANHAMENTO.md`](GUIA_ACOMPANHAMENTO.md) para o
+passo a passo. A equipe precisa de acesso ao arquivo no próprio Google Drive.
+
+Não é necessário criar projeto Google Cloud, configurar OAuth nem usar Secrets
+do Streamlit para esse fluxo. O Drive continua sendo necessário se a equipe
+quiser editar o mesmo Excel online; o GitHub já usado pelo site guarda a lista
+de links. Se o repositório for público, nomes e URLs do catálogo também serão
+públicos, mesmo que os arquivos do Drive mantenham acesso restrito.
 
 ## O que o site entrega
 
@@ -56,3 +62,8 @@ Se `.venv` já existe, execute apenas os três últimos comandos. Se o site já 
 ## Atualizar o site publicado
 
 Copie **todos os arquivos e a pasta `assets`** deste pacote para o repositório usado pelo Streamlit. Preserve os caminhos `assets/modelo_no1.xlsx`, `assets/modelo_no.xlsm`, `assets/modelo_resultado_apr.xlsx` e `assets/putz_identidade.webp`. Envie os arquivos atualizados para a mesma branch configurada para executar `app.py`. Não envie `.venv`, PDFs de clientes ou arquivos Excel de teste ao repositório.
+
+Ao trocar a versão anterior com API do Google, os arquivos antigos
+`acompanhamento_drive_ui.py`, `drive_acompanhamento.py`, `autorizar_drive.py`
+e `GUIA_GOOGLE_DRIVE.md` não são mais utilizados e podem ser retirados do
+repositório. O novo `links_acompanhamento.json` deve ficar ao lado de `app.py`.

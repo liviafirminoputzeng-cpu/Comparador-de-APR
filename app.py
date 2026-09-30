@@ -34,7 +34,7 @@ area = st.radio(
     key="area_site",
 )
 if area == "Acompanhamento de BowTies":
-    from acompanhamento_drive_ui import mostrar_acompanhamento
+    from acompanhamento_manual_ui import mostrar_acompanhamento
 
     mostrar_acompanhamento()
     st.stop()
