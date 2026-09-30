@@ -5,7 +5,10 @@
 1. Extraia o ZIP e envie **seu conteúdo** ao repositório GitHub do site,
    substituindo `app.py` e `requirements.txt`. Inclua os novos arquivos
    `acompanhamento_manual_ui.py`, `gerar_acompanhamento.py`,
-   `links_acompanhamento.json` e `assets/modelo_acompanhamento.xlsx`.
+   `assets/modelo_acompanhamento.xlsx`. **Não substitua o arquivo
+   `links_acompanhamento.json` já existente no GitHub**, pois ele guarda os
+   links dos projetos anteriores. Se ainda não existir, o primeiro cadastro
+   no site produzirá esse arquivo.
 2. Espere o Streamlit atualizar. No topo do site, selecione
    **Acompanhamento de BowTies**. Confirme as duas abas:
    **Gerar planilha Excel** e **Planilhas compartilhadas**.
@@ -22,6 +25,12 @@
 3. Abra o Excel e confira as abas `Painel`, `Controle` e `Equipe`. Nós,
    cenários, sistemas, eventos topo e páginas vêm da APR atualizada. O
    responsável, tipo de trabalho, prazo e progresso ficam para a equipe.
+   Na aba `Controle`, classifique `Trabalho` como `Novo` ou `Correção`;
+   para cada `Novo`, escolha a etapa em `Planilha produzida` (`A fazer`,
+   `Em produção` ou `Produzida`) e o `Responsável pela produção`.
+   Cadastre os nomes dos dois estagiários em `Equipe`, células `C25:C26`.
+   O bloco final do `Painel` mostra as planilhas novas por etapa e por
+   estagiário, além das que faltam atribuir ou classificar.
 
 ## Compartilhar a planilha no Drive
 
@@ -31,7 +40,7 @@
 3. No Drive, configure o acesso dos dois analistas e do coordenador como
    **Editor**. Abra o Excel no navegador e confirme que ele pode ser editado
    sem convertê-lo para outro arquivo.
-4. Clique em **Compartilhar → Copiar link** do **arquivo**, não da pasta.
+4. Clique em **Compartilhar → Copiar link** do **arquivo Excel**, não da pasta.
 
 ## Colocar o link na aba do site
 
@@ -39,16 +48,19 @@
 2. Preencha **Projeto da planilha compartilhada** e cole o link do arquivo.
 3. Clique em **Preparar inclusão do link**. O link é mostrado para teste na
    sua sessão; ainda não está publicado para a equipe.
-4. Clique em **Baixar catálogo atualizado para publicar no site (.json)**.
-5. No GitHub, abra o mesmo repositório do site e substitua o arquivo
+4. Você pode repetir os passos 2 e 3 para preparar **vários projetos** nesta
+   sessão. A lista de pendentes aparecerá abaixo do formulário.
+5. Depois do último projeto, clique em **Baixar catálogo atualizado para
+   publicar no site (.json)**. Ele contém os projetos anteriores e os novos.
+6. No GitHub, abra o mesmo repositório do site e substitua o arquivo
    `links_acompanhamento.json` pelo arquivo recém-baixado. Faça **Commit
    changes**. Depois da atualização do Streamlit, os links publicados
    aparecerão para todos os visitantes da aba.
 
-Para adicionar outro projeto, **abra o site novamente depois que o GitHub
-publicar o catálogo anterior**; assim, o próximo download já incluirá todos
-os projetos anteriores. Se usar o mesmo nome de projeto, o link anterior será
-substituído no novo catálogo. Não edite o Excel do modelo dentro do GitHub:
+Para adicionar projetos em outro dia, **abra o site novamente depois que o
+GitHub publicar o catálogo anterior**; assim, o próximo download já incluirá
+todos os projetos anteriores. Se usar o mesmo nome de projeto, o link anterior
+será substituído no novo catálogo. Não edite o Excel do modelo dentro do GitHub:
 o acompanhamento da equipe acontece no arquivo compartilhado do Drive.
 
 O site é público, portanto a lista de nomes e URLs no catálogo também poderá

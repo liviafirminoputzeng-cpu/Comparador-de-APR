@@ -11,13 +11,17 @@ ou se um BowTie existente precisará de correção; a equipe preencherá isso.
 
 O coordenador envia o Excel à
 [pasta compartilhada da PUTZ](https://drive.google.com/drive/folders/1ichy39_gjGtfzALO66pe275YxY-HdRSh?usp=drive_link)
-manualmente e copia o link do arquivo. Na aba **Planilhas compartilhadas**,
-pode colar nome do projeto e link. A tela prepara o arquivo
-`links_acompanhamento.json` atualizado; para que o link apareça a toda a equipe
-mesmo depois de reiniciar o site, substitua esse arquivo no repositório GitHub
-e faça o commit. O site apenas lê esse catálogo: não grava dados persistentes
-no servidor. Consulte [`GUIA_ACOMPANHAMENTO.md`](GUIA_ACOMPANHAMENTO.md) para o
-passo a passo. A equipe precisa de acesso ao arquivo no próprio Google Drive.
+manualmente e copia o link do arquivo. A aba `Controle` inclui a etapa de
+produção da planilha e a atribuição a um dos dois estagiários; o `Painel`
+resume a produção dos itens classificados como `Novo`. Na aba **Planilhas compartilhadas**,
+pode colar nome do projeto e o **link da planilha, nunca o da pasta**. É
+possível preparar vários projetos na mesma sessão: o site soma os novos links
+aos já publicados. A tela prepara o arquivo `links_acompanhamento.json`
+atualizado; para que todos vejam os novos links depois de reiniciar o site,
+substitua esse arquivo no repositório GitHub e faça o commit. O site não
+grava dados persistentes no servidor. Consulte
+[`GUIA_ACOMPANHAMENTO.md`](GUIA_ACOMPANHAMENTO.md) para o passo a passo.
+Não sobrescreva o catálogo existente ao atualizar o código do programa.
 
 Não é necessário criar projeto Google Cloud, configurar OAuth nem usar Secrets
 do Streamlit para esse fluxo. O Drive continua sendo necessário se a equipe
@@ -61,7 +65,14 @@ Se `.venv` já existe, execute apenas os três últimos comandos. Se o site já 
 
 ## Atualizar o site publicado
 
-Copie **todos os arquivos e a pasta `assets`** deste pacote para o repositório usado pelo Streamlit. Preserve os caminhos `assets/modelo_no1.xlsx`, `assets/modelo_no.xlsm`, `assets/modelo_resultado_apr.xlsx` e `assets/putz_identidade.webp`. Envie os arquivos atualizados para a mesma branch configurada para executar `app.py`. Não envie `.venv`, PDFs de clientes ou arquivos Excel de teste ao repositório.
+Copie **todos os arquivos e a pasta `assets`** deste pacote para o repositório
+usado pelo Streamlit. Preserve os caminhos `assets/modelo_no1.xlsx`,
+`assets/modelo_no.xlsm`, `assets/modelo_resultado_apr.xlsx` e
+`assets/putz_identidade.webp`. Envie os arquivos atualizados para a mesma
+branch configurada para executar `app.py`. **Preserve no GitHub o arquivo
+`links_acompanhamento.json` que já reúne seus projetos.** Ele não está neste
+pacote de atualização para evitar a perda de links cadastrados. Não envie
+`.venv`, PDFs de clientes ou arquivos Excel de teste ao repositório.
 
 Ao trocar a versão anterior com API do Google, os arquivos antigos
 `acompanhamento_drive_ui.py`, `drive_acompanhamento.py`, `autorizar_drive.py`

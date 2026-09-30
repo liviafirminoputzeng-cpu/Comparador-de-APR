@@ -116,7 +116,8 @@ def mostrar_acompanhamento():
                                        type="primary")
                     st.caption("Após baixar, envie o Excel à pasta compartilhada da equipe no Drive. "
                                "Em seguida, copie o link do arquivo e registre-o na aba ao lado. "
-                               "O responsável, o tipo de trabalho e as datas são preenchidos pela equipe.")
+                               "Na aba Controle, classifique os novos BowTies, a etapa da planilha "
+                               "e o estagiário responsável pela produção.")
                 except ValueError as erro:
                     st.warning(str(erro))
                 except Exception:
@@ -130,6 +131,16 @@ def mostrar_acompanhamento():
             st.error("O arquivo links_acompanhamento.json está inválido. "
                      "Corrija-o no repositório antes de cadastrar outro link.")
             return
+        # Uma publicação nova passa a ser a base da sessão; um rascunho antigo
+        # nunca deve sobrescrever links que chegaram depois pelo GitHub.
+        assinatura_publicada = hashlib.sha256(
+            CATALOGO.read_bytes() if CATALOGO.is_file() else b""
+        ).hexdigest()
+        if st.session_state.get("catalogo_publicado_hash") != assinatura_publicada:
+            for chave in ("catalogo_preparado", "links_pendentes",
+                          "projeto_preparado", "url_preparada"):
+                st.session_state.pop(chave, None)
+            st.session_state["catalogo_publicado_hash"] = assinatura_publicada
         if publicados:
             for item in publicados:
                 with st.container(border=True):
@@ -148,22 +159,30 @@ def mostrar_acompanhamento():
             preparar = st.form_submit_button("Preparar inclusão do link")
         if preparar:
             try:
-                novo_catalogo = preparar_catalogo(publicados, projeto_link, url_link)
+                base = st.session_state.get("links_pendentes", publicados)
+                novo_catalogo = preparar_catalogo(base, projeto_link, url_link)
                 st.session_state["catalogo_preparado"] = novo_catalogo
+                st.session_state["links_pendentes"] = json.loads(novo_catalogo)["projetos"]
                 st.session_state["projeto_preparado"] = " ".join(projeto_link.split())
                 st.session_state["url_preparada"] = _link_planilha(url_link)
             except ValueError as erro:
-                st.session_state.pop("catalogo_preparado", None)
                 st.error(str(erro))
         if st.session_state.get("catalogo_preparado"):
-            st.success(f"Link de {st.session_state['projeto_preparado']} preparado para publicação.")
+            pendentes = st.session_state["links_pendentes"]
+            publicados_por_nome = {p["projeto"].casefold(): p["url"] for p in publicados}
+            alterados = [p for p in pendentes if publicados_por_nome.get(p["projeto"].casefold()) != p["url"]]
+            st.success(f"{len(alterados)} link(s) preparado(s) para publicação. "
+                       "Você pode adicionar outros antes de baixar o catálogo.")
+            for item in alterados:
+                st.write(f"• {item['projeto']}")
             st.link_button("Abrir o link informado ↗", st.session_state["url_preparada"])
             st.download_button("Baixar catálogo atualizado para publicar no site (.json)",
                                st.session_state["catalogo_preparado"],
                                file_name="links_acompanhamento.json", mime="application/json")
-            st.info("Para que toda a equipe veja o link aqui, substitua "
-                    "links_acompanhamento.json no GitHub por esse arquivo e faça o commit. "
-                    "Até a publicação, o link aparece somente nesta sessão.")
+            st.info("Este arquivo reúne os links já publicados e os novos. "
+                    "Depois de cadastrar todos os projetos desejados, substitua "
+                    "links_acompanhamento.json no GitHub e faça o commit. "
+                    "Até lá, os novos links aparecem somente nesta sessão.")
         st.caption("Se o repositório ou site for público, nomes de projetos e links "
                    "publicados também ficarão visíveis. Mantenha os arquivos do Drive "
                    "restritos à equipe.")
