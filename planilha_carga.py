@@ -202,7 +202,18 @@ def gerar_planilha_carga(conteudo: bytes):
         raise ValueError("A aba BT não contém evento topo, ameaças, consequências ou descrição do nó.")
     barreiras = _barreiras(wb, valores, site, area, ident)
     avisos = _avisos_consistencia(definicoes, barreiras, site, area, ident)
-    saida = load_workbook(MODELO)
+    if not MODELO.is_file():
+        raise ValueError(
+            "O modelo da planilha de carga não foi encontrado no site. "
+            "Adicione assets/modelo_planilha_carga.xlsx ao GitHub e aguarde a publicação."
+        )
+    try:
+        saida = load_workbook(MODELO)
+    except Exception as exc:
+        raise ValueError(
+            "O arquivo assets/modelo_planilha_carga.xlsx não pôde ser aberto. "
+            "Publique a cópia do modelo incluída no pacote de atualização."
+        ) from exc
     if saida.sheetnames != ["Def", "Data"]:
         raise ValueError("O modelo de carga precisa ter apenas as abas Def e Data.")
     _preencher(saida["Def"], definicoes, DEF)

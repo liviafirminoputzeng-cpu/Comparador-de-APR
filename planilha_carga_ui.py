@@ -6,7 +6,7 @@ from pathlib import Path
 
 import streamlit as st
 
-from planilha_carga import gerar_planilha_carga, gerar_planilhas_carga_zip
+from planilha_carga import MODELO, gerar_planilha_carga, gerar_planilhas_carga_zip
 
 
 IMAGEM = Path(__file__).resolve().parent / "assets" / "putz_identidade.webp"
@@ -31,6 +31,10 @@ def mostrar_planilha_carga():
     </style><div class="area-carga"><h1>Planilha de carga</h1>
     <p>Envie um BowTie e gere um Excel com as abas Def e Data no formato dos modelos.</p>
     </div>""", unsafe_allow_html=True)
+    if not MODELO.is_file():
+        st.error("Falta o modelo de carga no site: assets/modelo_planilha_carga.xlsx. "
+                 "Envie esse arquivo para a pasta assets no GitHub e aguarde a atualização do Streamlit.")
+        return
     individual, lote = st.tabs(["Um BowTie", "Vários BowTies em ZIP"])
     with individual:
         arquivo = st.file_uploader("Selecione um BowTie em Excel", type=["xlsx", "xlsm"],
@@ -40,8 +44,9 @@ def mostrar_planilha_carga():
                 dados, resumo, avisos = gerar_planilha_carga(arquivo.getvalue())
             except ValueError as erro:
                 st.error(str(erro))
-            except Exception:
-                st.error("Não foi possível gerar a planilha de carga. Confira o BowTie enviado.")
+            except Exception as erro:
+                st.error("Não foi possível gerar a planilha de carga. "
+                         f"Falha técnica: {type(erro).__name__}: {erro}")
             else:
                 st.write(f"**Def:** {resumo['def']} registros · **Data:** {resumo['data']} registros")
                 for aviso in avisos:
@@ -64,8 +69,9 @@ def mostrar_planilha_carga():
                     dados_zip, resultados = _lote_processado(pacote.getvalue())
             except ValueError as erro:
                 st.error(str(erro))
-            except Exception:
-                st.error("Não foi possível processar o ZIP. Confira os BowTies enviados.")
+            except Exception as erro:
+                st.error("Não foi possível processar o ZIP. "
+                         f"Falha técnica: {type(erro).__name__}: {erro}")
             else:
                 st.success(f"{len(resultados)} planilha(s) de carga preparada(s).")
                 st.dataframe([
