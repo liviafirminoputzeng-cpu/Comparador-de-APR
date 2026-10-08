@@ -41,6 +41,23 @@ def gerar_planilha_acompanhamento(apr_atualizada, projeto):
     try:
         controle = wb["Controle"]
         painel = wb["Painel"]
+        cabecalhos_esperados = {
+            "F8": "Trabalho",
+            "G8": "Planilha produzida",
+            "H8": "Responsável pela produção",
+            "I8": "Responsável",
+            "J8": "Situação",
+            "T8": "Página PDF",
+        }
+        if (any(controle[endereco].value != titulo
+                for endereco, titulo in cabecalhos_esperados.items())
+                or painel["B44"].value != "Planilhas dos novos BowTies"
+                or wb["Equipe"]["B25"].value != "Estagiário 1"):
+            raise ValueError(
+                "O modelo de acompanhamento do site está desatualizado. "
+                "No GitHub, substitua assets/modelo_acompanhamento.xlsx pelo arquivo corrigido, "
+                "faça Commit changes e gere a planilha novamente."
+            )
         # Mantém cabeçalhos, cores, validações, fórmulas e o gráfico do modelo.
         for linha in range(9, 209):
             for col in range(1, 21):

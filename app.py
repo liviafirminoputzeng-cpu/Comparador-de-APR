@@ -29,7 +29,7 @@ st.set_page_config(
 
 area = st.radio(
     "Escolha uma área do site",
-    ["Comparador de APR", "Acompanhamento de BowTies"],
+    ["Comparador de APR", "Acompanhamento de BowTies", "Planilha de carga"],
     horizontal=True,
     key="area_site",
 )
@@ -37,6 +37,11 @@ if area == "Acompanhamento de BowTies":
     from acompanhamento_manual_ui import mostrar_acompanhamento
 
     mostrar_acompanhamento()
+    st.stop()
+if area == "Planilha de carga":
+    from planilha_carga_ui import mostrar_planilha_carga
+
+    mostrar_planilha_carga()
     st.stop()
 
 CAMINHO_CAPA = Path(__file__).resolve().parent / "assets" / "putz_identidade.webp"

@@ -49,13 +49,27 @@
 3. Clique em **Preparar inclusão do link**. O link é mostrado para teste na
    sua sessão; ainda não está publicado para a equipe.
 4. Você pode repetir os passos 2 e 3 para preparar **vários projetos** nesta
-   sessão. A lista de pendentes aparecerá abaixo do formulário.
+   sessão. Os novos projetos entram no fim da lista; trocar o link de um
+   projeto existente mantém sua posição.
 5. Depois do último projeto, clique em **Baixar catálogo atualizado para
    publicar no site (.json)**. Ele contém os projetos anteriores e os novos.
 6. No GitHub, abra o mesmo repositório do site e substitua o arquivo
    `links_acompanhamento.json` pelo arquivo recém-baixado. Faça **Commit
    changes**. Depois da atualização do Streamlit, os links publicados
    aparecerão para todos os visitantes da aba.
+
+## Mudar a ordem ou excluir um link
+
+1. Abra **Acompanhamento de BowTies → Planilhas compartilhadas**.
+2. Use **↑** ou **↓** ao lado do projeto para movê-lo uma posição. Use
+   **Excluir** para retirá-lo da lista. Esses botões preparam uma prévia
+   apenas na sua sessão; o arquivo do Drive não é apagado.
+3. Confira a lista. Se mudar de ideia, clique em **Desfazer alterações desta
+   sessão**. Você também pode cadastrar novos links antes de publicar.
+4. Clique em **Baixar catálogo atualizado para publicar no site (.json)**.
+   No GitHub, substitua o arquivo `links_acompanhamento.json` da página
+   principal do repositório e faça **Commit changes**. Só então toda a
+   equipe verá a nova ordem e as exclusões.
 
 Para adicionar projetos em outro dia, **abra o site novamente depois que o
 GitHub publicar o catálogo anterior**; assim, o próximo download já incluirá
